@@ -13,6 +13,11 @@ import (
 )
 
 func appDataDir() string {
+	if previewBuild {
+		if exe, err := os.Executable(); err == nil {
+			return filepath.Join(filepath.Dir(exe), "data")
+		}
+	}
 	base := os.Getenv("LOCALAPPDATA")
 	if base == "" {
 		base = os.Getenv("APPDATA")

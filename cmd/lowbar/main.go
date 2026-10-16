@@ -21,6 +21,7 @@ func main() {
 
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+	modernTaskbar = detectModernTaskbar()
 	openLog()
 	logContext()
 	defer func() {
@@ -63,7 +64,9 @@ func main() {
 	}
 	trayData = &tray
 	applyStyle(cfg.style)
-	startExplorerIntegration(hwnd)
+	if !modernTaskbar {
+		startExplorerIntegration(hwnd)
+	}
 	if err := saveConfig(cfg); err != nil {
 		logError("config.save", "initial config save failed", err)
 	}

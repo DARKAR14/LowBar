@@ -52,14 +52,16 @@ func windowProc(hwnd uintptr, message uint32, wParam uintptr, lParam uintptr) ui
 		return 0
 	}
 	if hookBlockMsg != 0 && message == hookBlockMsg {
-		if globalConfig != nil && !shuttingDown {
+		if globalConfig != nil && !shuttingDown && globalConfig.style != styleNormal {
 			return 1
 		}
 		return 0
 	}
 	if taskbarMsg != 0 && message == taskbarMsg && globalConfig != nil && !shuttingDown {
 		reinstallTrayIcon(syscall.Handle(hwnd))
-		installExplorerHookForTaskbarCreation()
+		if !modernTaskbar {
+			installExplorerHookForTaskbarCreation()
+		}
 		applyStyle(globalConfig.style)
 		return 0
 	}
