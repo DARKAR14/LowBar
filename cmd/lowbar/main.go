@@ -36,6 +36,9 @@ func main() {
 		return
 	}
 	cfg := loadConfig()
+	if previewBuild {
+		cfg.autoUpdate = false
+	}
 	startup := isStartupEnabled()
 	if cfg.startup != startup {
 		cfg.startup = startup

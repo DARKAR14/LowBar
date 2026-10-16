@@ -18,9 +18,9 @@ $oldOS = $env:GOOS
 try {
     $env:GOOS = 'windows'
     $env:GOARCH = 'amd64'
-    & $Go test ./cmd/lowbar
+    & $Go test -tags xamlpreview ./cmd/lowbar
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
-    & $Go build -trimpath '-ldflags=-s -w -H=windowsgui' -o (Join-Path $output 'LowBar.exe') ./cmd/lowbar
+    & $Go build -tags xamlpreview -trimpath '-ldflags=-s -w -H=windowsgui' -o (Join-Path $output 'LowBar.exe') ./cmd/lowbar
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     Copy-Item (Join-Path $deps 'ttb/ExplorerTAP.dll') $output -Force
     New-Item -ItemType Directory -Force (Join-Path $output 'Assets') | Out-Null

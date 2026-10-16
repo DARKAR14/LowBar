@@ -1,4 +1,4 @@
-//go:build windows
+//go:build windows && !xamlpreview
 
 package main
 
