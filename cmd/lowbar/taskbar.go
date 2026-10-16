@@ -46,6 +46,9 @@ func accentForStyle(style int) accentPolicy {
 }
 
 func setAccent(hwnd syscall.Handle, style int) bool {
+	if modernTaskbar {
+		return setXamlStyle(hwnd, style)
+	}
 	if hwnd == 0 {
 		return false
 	}
@@ -92,6 +95,15 @@ func applyStyleInternal(style int, verbose bool) {
 		return
 	}
 
+	if modernTaskbar {
+		if err := ensureTAP(); err != nil {
+			logError("taskbar.xaml", "cannot apply requested style", err)
+			if verbose {
+				showError(appName, err)
+			}
+			return
+		}
+	}
 	success := 0
 	for _, hwnd := range windows {
 		if setAccent(hwnd, style) {

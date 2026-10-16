@@ -1,11 +1,11 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Installs or updates the official LowBar release for the current Windows user.
+    Installs the Windows 11 XAML fork for the current Windows user.
 
 .DESCRIPTION
-    Downloads the official LowBar release package from GitHub,
-    extracts LowBar.exe, LowBarExplorerHook.dll, and the Assets directory,
+    Downloads the fork release package from GitHub,
+    extracts LowBar.exe, ExplorerTAP.dll, and the Assets directory,
     installs them under the current user's local programs directory,
     replaces an existing installation in place, restarts LowBar after an update,
     creates a Start Menu shortcut, and optionally creates a Desktop shortcut
@@ -15,27 +15,27 @@
     The GitHub release asset must be named LowBar.zip and contain:
 
         LowBar.exe
-        LowBarExplorerHook.dll
+        ExplorerTAP.dll
         Assets\...
 
 .EXAMPLE
-    irm https://raw.githubusercontent.com/chematic/LowBar/main/install.ps1 | iex
+    irm https://raw.githubusercontent.com/DARKAR14/LowBar/main/install.ps1 | iex
 
 .EXAMPLE
-    irm https://raw.githubusercontent.com/chematic/LowBar/main/install.ps1 | iex -Version 0.1.0
+    & ([scriptblock]::Create((irm https://raw.githubusercontent.com/DARKAR14/LowBar/main/install.ps1))) -Version 0.1.4-xaml
 #>
 
 [CmdletBinding()]
 param(
     [string]$Version,
     [string]$InstallRoot = "$env:LOCALAPPDATA\Programs\LowBar",
-    [switch]$NoDesktopPrompt
+    [switch]$DesktopShortcut
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$repo = 'chematic/LowBar'
+$repo = 'DARKAR14/LowBar'
 $assetName = 'LowBar.zip'
 $apiHeaders = @{ 'User-Agent' = 'LowBar-Installer' }
 
@@ -120,22 +120,7 @@ function Stop-LowBarForUpdate {
         return
     }
 
-    $matching = @(
-        $running | Where-Object {
-            try {
-                $path = $_.Path
-                [string]::IsNullOrWhiteSpace($path) -or
-                    [string]::Equals(
-                        [System.IO.Path]::GetFullPath($path),
-                        [System.IO.Path]::GetFullPath($TargetPath),
-                        [System.StringComparison]::OrdinalIgnoreCase
-                    )
-            }
-            catch {
-                $true
-            }
-        }
-    )
+    $matching = @($running)
 
     if ($matching.Count -eq 0) {
         return
@@ -143,16 +128,12 @@ function Stop-LowBarForUpdate {
 
     Write-Step 'Stopping the running LowBar instance for the update...'
 
-    if (Test-Path -LiteralPath $TargetPath -PathType Leaf) {
+    foreach ($process in $matching) {
         try {
-            Start-Process `
-                -FilePath $TargetPath `
-                -ArgumentList '--shutdown' `
-                -WindowStyle Hidden `
-                -ErrorAction Stop |
-                Out-Null
-        }
-        catch {
+            if ($process.Path -and (Test-Path -LiteralPath $process.Path -PathType Leaf)) {
+                Start-Process -FilePath $process.Path -ArgumentList '--shutdown' -WindowStyle Hidden -ErrorAction Stop | Out-Null
+            }
+        } catch {
             Write-Host '[LowBar] Graceful shutdown request could not be sent; continuing with process shutdown.' -ForegroundColor DarkYellow
         }
     }
@@ -238,18 +219,23 @@ function New-Shortcut {
 try {
     Write-Host ''
     Write-Host 'LowBar Installer' -ForegroundColor White
-    Write-Host 'Official release installer for Windows' -ForegroundColor DarkGray
+    Write-Host 'Windows 11 XAML fork installer' -ForegroundColor DarkGray
     Write-Host ''
 
     if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
         throw 'LowBar can only be installed on Windows.'
     }
 
+    $build = [int](Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion').CurrentBuild
+    if ($build -lt 22621 -or -not [Environment]::Is64BitOperatingSystem) {
+        throw 'This fork requires Windows 11 x64, build 22621 or newer.'
+    }
+
     if ([string]::IsNullOrWhiteSpace($env:APPDATA)) {
         throw 'The APPDATA environment variable is not available.'
     }
 
-    Write-Step 'Checking the official GitHub release...'
+    Write-Step 'Checking the fork GitHub release...'
 
     $release = Get-Release
     $asset = Find-ReleaseAsset -Release $release
@@ -275,6 +261,14 @@ try {
         throw 'The download completed without producing the expected ZIP archive.'
     }
 
+    if ($null -ne $asset.PSObject.Properties['digest'] -and $asset.digest -and $asset.digest.StartsWith('sha256:')) {
+        $expectedHash = $asset.digest.Substring(7)
+        $actualHash = (Get-FileHash -LiteralPath $tempZip -Algorithm SHA256).Hash
+        if ($actualHash -ne $expectedHash) {
+            throw 'The release ZIP SHA256 does not match the GitHub release metadata.'
+        }
+    }
+
     Write-Step 'Extracting the release package...'
 
     New-Item `
@@ -289,7 +283,7 @@ try {
         -Force
 
     $packageExe = Join-Path $tempExtract 'LowBar.exe'
-    $packageHook = Join-Path $tempExtract 'LowBarExplorerHook.dll'
+    $packageHook = Join-Path $tempExtract 'ExplorerTAP.dll'
     $packageAssets = Join-Path $tempExtract 'Assets'
 
     if (-not (Test-Path -LiteralPath $packageExe -PathType Leaf)) {
@@ -297,7 +291,7 @@ try {
     }
 
     if (-not (Test-Path -LiteralPath $packageHook -PathType Leaf)) {
-        throw "The release package is invalid: 'LowBarExplorerHook.dll' was not found at the archive root."
+        throw "The release package is invalid: 'ExplorerTAP.dll' was not found at the archive root."
     }
 
     if (-not (Test-Path -LiteralPath $packageAssets -PathType Container)) {
@@ -313,14 +307,12 @@ try {
         Out-Null
 
     $targetExe = Join-Path $InstallRoot 'LowBar.exe'
-    $targetHook = Join-Path $InstallRoot 'LowBarExplorerHook.dll'
+    $targetHook = Join-Path $InstallRoot 'ExplorerTAP.dll'
     $targetAssets = Join-Path $InstallRoot 'Assets'
     $isUpdate = Test-Path -LiteralPath $targetExe -PathType Leaf
 
-    if ($isUpdate) {
-        Write-Step 'Existing LowBar installation detected; updating it in place.'
-        Stop-LowBarForUpdate -TargetPath $targetExe
-    }
+    if ($isUpdate) { Write-Step 'Existing LowBar installation detected; updating it in place.' }
+    Stop-LowBarForUpdate -TargetPath $targetExe
 
     Write-Step $(if ($isUpdate) { 'Replacing LowBar.exe...' } else { 'Installing LowBar.exe...' })
 
@@ -329,7 +321,7 @@ try {
         -Destination $targetExe `
         -Force
 
-    Write-Step $(if ($isUpdate) { 'Replacing LowBarExplorerHook.dll...' } else { 'Installing LowBarExplorerHook.dll...' })
+    Write-Step $(if ($isUpdate) { 'Replacing ExplorerTAP.dll...' } else { 'Installing ExplorerTAP.dll...' })
 
     Copy-Item `
         -LiteralPath $packageHook `
@@ -356,7 +348,7 @@ try {
     }
 
     if (-not (Test-Path -LiteralPath $targetHook -PathType Leaf)) {
-        throw 'LowBarExplorerHook.dll was not installed correctly.'
+        throw 'ExplorerTAP.dll was not installed correctly.'
     }
 
     if (-not (Test-Path -LiteralPath $targetAssets -PathType Container)) {
@@ -389,13 +381,7 @@ try {
     $createDesktopShortcut = $false
     $desktopShortcut = $null
 
-    if (-not $NoDesktopPrompt -and -not $isUpdate) {
-        $desktopAnswer = Read-Host `
-            'Add a LowBar shortcut to the Desktop? [Y/N]'
-
-        $createDesktopShortcut =
-            $desktopAnswer -match '^(Y|y|Yes|yes|O|o|Oui|oui)$'
-    }
+    $createDesktopShortcut = $DesktopShortcut -and -not $isUpdate
 
     if ($createDesktopShortcut) {
         $desktopPath = [Environment]::GetFolderPath('Desktop')

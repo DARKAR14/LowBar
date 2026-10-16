@@ -104,6 +104,9 @@ func saveUpdateState(state updateState) {
 }
 
 func scheduleUpdateChecks(cfg *config) {
+	if previewBuild {
+		return
+	}
 	if cfg == nil || !cfg.autoUpdate {
 		return
 	}
@@ -126,6 +129,12 @@ func startUpdateCheckManually() {
 }
 
 func checkForUpdates(manual bool) {
+	if previewBuild {
+		if manual {
+			postUpdateResult("Esta versión de prueba XAML se actualiza manualmente; las versiones oficiales de LowBar no incluyen esta corrección.")
+		}
+		return
+	}
 	if !manual && (globalConfig == nil || !globalConfig.autoUpdate) {
 		return
 	}

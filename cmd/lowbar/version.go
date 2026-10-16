@@ -10,4 +10,6 @@ const (
 
 // buildVersion is replaced by scripts/package-release.ps1 for official builds.
 // The fallback keeps local development builds usable.
-var buildVersion = "0.1.3"
+var buildVersion = "0.1.4-xaml-preview"
+
+const previewBuild = true
