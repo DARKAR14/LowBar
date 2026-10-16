@@ -10,7 +10,7 @@ Abre PowerShell en Windows 11 x64 (build 22621 o posterior) y ejecuta:
 irm https://raw.githubusercontent.com/DARKAR14/LowBar/main/install.ps1 | iex
 ```
 
-El comando estará operativo **cuando este fork publique una release** que contenga `LowBar.zip`. Descarga la release, comprueba que incluya el ejecutable y ExplorerTAP.dll, instala para el usuario actual y abre LowBar. Al repetirlo, actualiza la instalación. No requiere Go ni LLVM. Las actualizaciones automáticas están desactivadas en esta versión; repite el comando para actualizar.
+El comando descarga la última release publicada de este fork, instala LowBar para el usuario actual y lo inicia. No requiere Go ni LLVM. Desde v0.1.6, LowBar avisa de nuevas releases, las instala y vuelve a aplicar la barra automáticamente. Las versiones anteriores necesitan repetir el comando una vez para recibir esta función.
 
 Para activar el inicio con Windows, usa «Abrir al iniciar» en el menú del icono. Para volver al aspecto de Windows, elige «Normal» o «Salir».
 

@@ -12,9 +12,11 @@ versión se abra al iniciar sesión, activa «Abrir al iniciar» desde ese menú
 No muevas la carpeta después de activar esa opción.
 
 La configuración queda en `data/settings.ini`, junto al ejecutable. Los
-registros están en `%TEMP%\LowBar\lowbar.log`. Las actualizaciones del
-repositorio original están desactivadas en esta compilación para evitar que
-reemplacen el arreglo. No se ha cambiado la instalación anterior.
+registros están en `%TEMP%\LowBar\lowbar.log`. A partir de v0.1.6, la
+comprobación automática consulta las releases publicadas de este fork una vez
+al día. Muestra un aviso, instala la versión nueva y reinicia LowBar para
+volver a aplicar el estilo. El menú permite comprobar manualmente o desactivar
+las actualizaciones. Los cambios de código sin una release no se instalan.
 
 ## Qué cambia
 
@@ -33,7 +35,8 @@ periódico para imponer el estilo.
 
 - Compilación Windows x64 y pruebas Go de la interfaz COM y los cinco estilos.
 - La compilación `xamlpreview` excluye el actualizador oficial desactivado y
-  sus dependencias de red/ZIP. En una comparación local, la memoria privada
+  sus dependencias de red/ZIP del proceso residente; usa un proceso temporal
+  para comprobar releases. En una comparación local, la memoria privada
   bajó de 46,2 MB (v0.1.4) a 13,8–13,9 MB (v0.1.5); la memoria residente puede
   variar con el tiempo y según Windows.
 - El mutex de instancia única usa el error devuelto directamente por Win32;

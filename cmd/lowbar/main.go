@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"unsafe"
@@ -36,8 +37,15 @@ func main() {
 		return
 	}
 	cfg := loadConfig()
+	// Earlier XAML releases forcibly disabled updates and persisted that value.
+	// Enable them once on migration; later menu choices remain respected.
 	if previewBuild {
-		cfg.autoUpdate = false
+		marker := filepath.Join(appDataDir(), "updates-v2-migrated")
+		if _, err := os.Stat(marker); os.IsNotExist(err) {
+			cfg.autoUpdate = true
+			_ = os.MkdirAll(appDataDir(), 0700)
+			_ = os.WriteFile(marker, []byte("1"), 0600)
+		}
 	}
 	startup := isStartupEnabled()
 	if cfg.startup != startup {

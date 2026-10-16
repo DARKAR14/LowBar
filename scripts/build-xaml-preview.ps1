@@ -25,7 +25,7 @@ try {
     Copy-Item (Join-Path $deps 'ttb/ExplorerTAP.dll') $output -Force
     New-Item -ItemType Directory -Force (Join-Path $output 'Assets') | Out-Null
     Copy-Item 'Assets/icon.png' (Join-Path $output 'Assets') -Force
-    Copy-Item LICENSE, LICENSE.TranslucentTB.md, THIRD_PARTY.md, docs/WINDOWS11-PREVIEW.md $output -Force
+    Copy-Item LICENSE, LICENSE.TranslucentTB.md, THIRD_PARTY.md, docs/WINDOWS11-PREVIEW.md, install.ps1, update.ps1 $output -Force
     $releaseZip = Join-Path $root 'dist/LowBar.zip'
     if (Test-Path -LiteralPath $releaseZip) { Remove-Item -LiteralPath $releaseZip }
     Compress-Archive -Path (Join-Path $output '*') -DestinationPath $releaseZip

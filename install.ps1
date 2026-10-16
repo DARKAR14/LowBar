@@ -285,6 +285,8 @@ try {
     $packageExe = Join-Path $tempExtract 'LowBar.exe'
     $packageHook = Join-Path $tempExtract 'ExplorerTAP.dll'
     $packageAssets = Join-Path $tempExtract 'Assets'
+    $packageInstaller = Join-Path $tempExtract 'install.ps1'
+    $packageUpdater = Join-Path $tempExtract 'update.ps1'
 
     if (-not (Test-Path -LiteralPath $packageExe -PathType Leaf)) {
         throw "The release package is invalid: 'LowBar.exe' was not found at the archive root."
@@ -296,6 +298,10 @@ try {
 
     if (-not (Test-Path -LiteralPath $packageAssets -PathType Container)) {
         throw "The release package is invalid: 'Assets' was not found at the archive root."
+    }
+    if (-not (Test-Path -LiteralPath $packageInstaller -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $packageUpdater -PathType Leaf)) {
+        throw 'The release package is missing its update scripts.'
     }
 
     Write-Step 'Preparing the per-user installation directory...'
@@ -327,6 +333,9 @@ try {
         -LiteralPath $packageHook `
         -Destination $targetHook `
         -Force
+
+    Copy-Item -LiteralPath $packageInstaller -Destination (Join-Path $InstallRoot 'install.ps1') -Force
+    Copy-Item -LiteralPath $packageUpdater -Destination (Join-Path $InstallRoot 'update.ps1') -Force
 
     Write-Step 'Installing application assets...'
 
@@ -407,14 +416,13 @@ try {
     Write-Success `
         $(if ($isUpdate) { "LowBar $($release.tag_name) updated successfully." } else { "LowBar $($release.tag_name) installed successfully." })
 
-    if ($isUpdate) {
-        Write-Step 'Starting the updated LowBar instance...'
-        Start-Process `
-            -FilePath $targetExe `
-            -WorkingDirectory $InstallRoot `
-            -ErrorAction Stop |
-            Out-Null
-    }
+    Write-Step 'Starting LowBar...'
+    Start-Process `
+        -FilePath $targetExe `
+        -WorkingDirectory $InstallRoot `
+        -WindowStyle Hidden `
+        -ErrorAction Stop |
+        Out-Null
 
     Write-Host `
         "Start Menu: $startMenuShortcut" `
