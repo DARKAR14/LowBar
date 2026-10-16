@@ -62,11 +62,13 @@ func showTrayMenu(hwnd syscall.Handle, cfg *config) {
 	if !appendMenu(menu, mfString, cmdRefresh, labels.refresh) {
 		return
 	}
-	if !appendMenu(menu, mfString, cmdCheckUpdates, labels.checkUpdates) {
-		return
-	}
-	if !appendMenu(menu, mfString, cmdAutoUpdates, labels.autoUpdates) {
-		return
+	if !previewBuild {
+		if !appendMenu(menu, mfString, cmdCheckUpdates, labels.checkUpdates) {
+			return
+		}
+		if !appendMenu(menu, mfString, cmdAutoUpdates, labels.autoUpdates) {
+			return
+		}
 	}
 	if !appendMenu(menu, mfPopup, langMenu, labels.language) {
 		return
@@ -92,7 +94,9 @@ func showTrayMenu(hwnd syscall.Handle, cfg *config) {
 	checkMenuItem.Call(langMenu, cmdLanguageGerman, menuCheckFlag(cfg.language == langGerman))
 	checkMenuItem.Call(langMenu, cmdLanguageRussian, menuCheckFlag(cfg.language == langRussian))
 	checkMenuItem.Call(menu, cmdStartup, menuCheckFlag(cfg.startup))
-	checkMenuItem.Call(menu, cmdAutoUpdates, menuCheckFlag(cfg.autoUpdate))
+	if !previewBuild {
+		checkMenuItem.Call(menu, cmdAutoUpdates, menuCheckFlag(cfg.autoUpdate))
+	}
 
 	var cursor point
 	if ret, _, err := getCursorPos.Call(uintptr(unsafe.Pointer(&cursor))); ret == 0 {

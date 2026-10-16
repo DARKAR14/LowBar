@@ -32,6 +32,12 @@ periódico para imponer el estilo.
 ## Validación y límites
 
 - Compilación Windows x64 y pruebas Go de la interfaz COM y los cinco estilos.
+- La compilación `xamlpreview` excluye el actualizador oficial desactivado y
+  sus dependencias de red/ZIP. En una comparación local, la memoria privada
+  bajó de 46,2 MB (v0.1.4) a 13,8–13,9 MB (v0.1.5); la memoria residente puede
+  variar con el tiempo y según Windows.
+- El mutex de instancia única usa el error devuelto directamente por Win32;
+  abrir LowBar otra vez no deja un segundo proceso residente.
 - Conexión real a Explorer y aplicación a dos barras; transparencia confirmada
   por el usuario en ambas pantallas.
 - Los otros estilos tienen pruebas de parámetros, pero requieren comprobación
