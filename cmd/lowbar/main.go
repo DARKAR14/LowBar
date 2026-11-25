@@ -68,6 +68,8 @@ func main() {
 	}
 	mainHwnd = hwnd
 	defer destroyWindow.Call(uintptr(hwnd))
+	registerTaskbarPowerNotifications(hwnd)
+	defer unregisterTaskbarPowerNotifications()
 	tray, err := installTrayIcon(hwnd)
 	if err != nil {
 		showError(appName, err)

@@ -150,7 +150,7 @@ func selectCommand(hwnd syscall.Handle, command uint32, cfg *config) {
 		}
 	case cmdAbout:
 		labels := texts(cfg.language)
-		showInfo(hwnd, labels.aboutTitle, labels.aboutBody)
+		showInfo(hwnd, labels.aboutTitle, "LowBar "+buildVersion+"\n\n"+labels.aboutBody)
 	case cmdExit:
 		requestExit(hwnd)
 	}

@@ -2,7 +2,10 @@
 
 package main
 
-import "syscall"
+import (
+	"syscall"
+	"unsafe"
+)
 
 func requestExit(hwnd syscall.Handle) {
 	if shuttingDown {
@@ -36,6 +39,23 @@ func windowProc(hwnd uintptr, message uint32, wParam uintptr, lParam uintptr) ui
 	case wmPowerBroadcast:
 		if wParam == pbtApmResumeSuspend || wParam == pbtApmResumeAutomatic {
 			scheduleTaskbarReapply(hwnd, "resume")
+		} else if wParam == pbtPowerSettingChange && lParam != 0 {
+			setting := (*powerBroadcastSetting)(unsafe.Pointer(lParam))
+			if setting.DataLength >= 4 {
+				value := *(*uint32)(unsafe.Pointer(lParam + unsafe.Offsetof(setting.Data)))
+				switch setting.PowerSetting {
+				case lidSwitchStateGUID:
+					logEvent("INFO", "taskbar.power", "lid state changed")
+					if value == 1 {
+						scheduleTaskbarReapply(hwnd, "lid opened")
+					}
+				case sessionDisplayStatusGUID:
+					logEvent("INFO", "taskbar.power", "session display state changed")
+					if value == 1 {
+						scheduleTaskbarReapply(hwnd, "display powered on")
+					}
+				}
+			}
 		}
 		return 1 // TRUE permits Windows to continue power processing.
 	case wmDisplayChange:
@@ -45,6 +65,7 @@ func windowProc(hwnd uintptr, message uint32, wParam uintptr, lParam uintptr) ui
 		if wParam == resumeTimerID {
 			killTimer.Call(hwnd, resumeTimerID)
 			if globalConfig != nil && !shuttingDown {
+				logEvent("INFO", "taskbar.reapply", "retrying style after power/display transition")
 				reapplyStyleSilently(globalConfig.style)
 				if resumeTimerStage == 1 {
 					resumeTimerStage = 2
