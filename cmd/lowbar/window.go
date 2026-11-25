@@ -33,6 +33,28 @@ func windowProc(hwnd uintptr, message uint32, wParam uintptr, lParam uintptr) ui
 		return 0
 	case wmCommand:
 		return 0
+	case wmPowerBroadcast:
+		if wParam == pbtApmResumeSuspend || wParam == pbtApmResumeAutomatic {
+			scheduleTaskbarReapply(hwnd, "resume")
+		}
+		return 1 // TRUE permits Windows to continue power processing.
+	case wmDisplayChange:
+		scheduleTaskbarReapply(hwnd, "display change")
+		return 0
+	case wmTimer:
+		if wParam == resumeTimerID {
+			killTimer.Call(hwnd, resumeTimerID)
+			if globalConfig != nil && !shuttingDown {
+				reapplyStyleSilently(globalConfig.style)
+				if resumeTimerStage == 1 {
+					resumeTimerStage = 2
+					setTimer.Call(hwnd, resumeTimerID, 6000, 0)
+				} else {
+					resumeTimerStage = 0
+				}
+			}
+			return 0
+		}
 	case wmBeginUpdate:
 		if !shuttingDown {
 			shuttingDown = true
@@ -45,6 +67,7 @@ func windowProc(hwnd uintptr, message uint32, wParam uintptr, lParam uintptr) ui
 		}
 		return 0
 	case wmClose:
+		killTimer.Call(hwnd, resumeTimerID)
 		destroyWindow.Call(hwnd)
 		return 0
 	case wmDestroy:
@@ -63,8 +86,28 @@ func windowProc(hwnd uintptr, message uint32, wParam uintptr, lParam uintptr) ui
 			installExplorerHookForTaskbarCreation()
 		}
 		applyStyle(globalConfig.style)
+		scheduleTaskbarReapply(hwnd, "taskbar recreated")
 		return 0
 	}
 	result, _, _ := defWindowProcW.Call(hwnd, uintptr(message), wParam, lParam)
 	return result
+}
+
+func scheduleTaskbarReapply(hwnd uintptr, reason string) {
+	if globalConfig == nil || shuttingDown || globalConfig.style == styleNormal {
+		return
+	}
+	// Explorer may recreate XAML surfaces after the broadcast. Two short,
+	// one-shot attempts cover both immediate and delayed monitor transitions.
+	killTimer.Call(hwnd, resumeTimerID)
+	if modernTaskbar {
+		releaseTAP()
+	}
+	resumeTimerStage = 1
+	if ret, _, err := setTimer.Call(hwnd, resumeTimerID, 1500, 0); ret == 0 {
+		resumeTimerStage = 0
+		logWin32Error("taskbar.reapply", "SetTimer", err)
+		return
+	}
+	logEvent("INFO", "taskbar.reapply", "scheduled after "+reason)
 }

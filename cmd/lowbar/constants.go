@@ -6,6 +6,12 @@ const (
 	wmDestroy      = 0x0002
 	wmClose        = 0x0010
 	wmCommand      = 0x0111
+	wmTimer        = 0x0113
+	wmDisplayChange = 0x007e
+	wmPowerBroadcast = 0x0218
+	pbtApmResumeSuspend = 0x0007
+	pbtApmResumeAutomatic = 0x0012
+	resumeTimerID = 1
 	wmApp          = 0x8000
 	wmTray         = wmApp + 1
 	wmShowMenu     = wmApp + 2

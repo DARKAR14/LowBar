@@ -20,6 +20,7 @@ var (
 	logHandle            *os.File
 	shuttingDown         bool
 	menuPosted           bool
+	resumeTimerStage     uint8
 	explorerPID          uint32
 	explorerModule       uintptr
 	mainHwnd             syscall.Handle
