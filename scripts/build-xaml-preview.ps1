@@ -1,9 +1,15 @@
-param([string]$Go = 'go')
+param([string]$Go = 'go', [string]$Version = '')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $output = Join-Path $root 'dist/xaml-preview'
 $deps = Join-Path $root 'dist/dependencies'
-New-Item -ItemType Directory -Force $output, $deps | Out-Null
+$expectedOutput = [System.IO.Path]::GetFullPath((Join-Path $root 'dist/xaml-preview'))
+$actualOutput = [System.IO.Path]::GetFullPath($output)
+if ($actualOutput -ne $expectedOutput -or
+    -not $actualOutput.StartsWith([System.IO.Path]::GetFullPath($root).TrimEnd('\') + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Refusing to clean a directory outside the LowBar build output.'
+}
+New-Item -ItemType Directory -Force $deps | Out-Null
 $archive = Join-Path $deps 'TranslucentTB-2026.4-x64.zip'
 if (-not (Test-Path -LiteralPath $archive)) {
     Invoke-WebRequest 'https://github.com/TranslucentTB/TranslucentTB/releases/download/2026.4/TranslucentTB-portable-x64.zip' -OutFile $archive
@@ -20,7 +26,18 @@ try {
     $env:GOARCH = 'amd64'
     & $Go test -tags xamlpreview ./cmd/lowbar
     if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
-    & $Go build -tags xamlpreview -trimpath '-ldflags=-s -w -H=windowsgui' -o (Join-Path $output 'LowBar.exe') ./cmd/lowbar
+    if (Test-Path -LiteralPath $actualOutput) {
+        Remove-Item -LiteralPath $actualOutput -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force $output | Out-Null
+    $linkFlags = '-s -w -H=windowsgui'
+    if ($Version) {
+        if ($Version -notmatch '^\d+\.\d+\.\d+(-[a-zA-Z0-9.-]+)?$') {
+            throw 'Version must be a numeric release version such as 0.1.7-win11.'
+        }
+        $linkFlags += " -X main.buildVersion=$Version"
+    }
+    & $Go build -tags xamlpreview -trimpath "-ldflags=$linkFlags" -o (Join-Path $output 'LowBar.exe') ./cmd/lowbar
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     Copy-Item (Join-Path $deps 'ttb-2026.4/ExplorerTAP.dll') $output -Force
     New-Item -ItemType Directory -Force (Join-Path $output 'Assets') | Out-Null

@@ -12,7 +12,7 @@ import (
 	"unsafe"
 )
 
-// ExplorerTAP 2026.2, ITaskbarAppearanceService (API version 4).
+// ExplorerTAP 2026.4, ITaskbarAppearanceService (API version 4).
 // See THIRD_PARTY.md. All calls belong to the locked UI thread.
 var tapIID = syscall.GUID{Data1: 0x5bcf9150, Data2: 0xc28a, Data3: 0x4ef2, Data4: [8]byte{0x91, 0x3c, 0x4c, 0x3e, 0xa2, 0xf5, 0xea, 0xd0}}
 var tapService uintptr

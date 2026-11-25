@@ -141,6 +141,7 @@ func selectCommand(hwnd syscall.Handle, command uint32, cfg *config) {
 			logError("config.save", "unable to save automatic update setting", err)
 		}
 		if cfg.autoUpdate {
+			scheduleUpdateChecks(cfg)
 			go checkForUpdates(false)
 		}
 	case cmdLanguageEnglish, cmdLanguageFrench, cmdLanguageSpanish, cmdLanguageGerman, cmdLanguageRussian:

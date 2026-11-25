@@ -29,7 +29,8 @@
 param(
     [string]$Version,
     [string]$InstallRoot = "$env:LOCALAPPDATA\Programs\LowBar",
-    [switch]$DesktopShortcut
+    [switch]$DesktopShortcut,
+    [switch]$AutoUpdate
 )
 
 Set-StrictMode -Version Latest
@@ -41,6 +42,14 @@ $apiHeaders = @{ 'User-Agent' = 'LowBar-Installer' }
 
 $tempZip = $null
 $tempExtract = $null
+$targetExe = Join-Path $InstallRoot 'LowBar.exe'
+$targetHook = Join-Path $InstallRoot 'ExplorerTAP.dll'
+$targetAssets = Join-Path $InstallRoot 'Assets'
+$backupExe = $null
+$backupHook = $null
+$backupAssets = $null
+$updateStarted = $false
+$wasRunning = $false
 
 function Write-Step {
     param([string]$Message)
@@ -50,6 +59,40 @@ function Write-Step {
 function Write-Success {
     param([string]$Message)
     Write-Host "[LowBar] $Message" -ForegroundColor Green
+}
+
+function Show-UpdateNotice {
+    param([string]$Message)
+    if (-not $AutoUpdate) { return }
+    try {
+        $shell = New-Object -ComObject WScript.Shell
+        [void]$shell.Popup($Message, 5, 'LowBar', 64)
+    } catch { }
+}
+
+function Get-SessionProcesses {
+    param([string]$Name)
+    $session = (Get-Process -Id $PID).SessionId
+    @(Get-Process -Name $Name -ErrorAction SilentlyContinue |
+        Where-Object { $_.SessionId -eq $session })
+}
+
+function Restart-ExplorerForHookUpdate {
+    $explorers = @(Get-SessionProcesses -Name explorer)
+    if ($explorers.Count -eq 0) { return }
+
+    Write-Step 'Restarting Windows Explorer to load the updated taskbar component...'
+    $explorers | Stop-Process -Force -ErrorAction Stop
+    for ($i = 0; $i -lt 40; $i++) {
+        Start-Sleep -Milliseconds 250
+        $old = @(Get-SessionProcesses -Name explorer |
+            Where-Object { $_.Id -in $explorers.Id })
+        if ($old.Count -eq 0) { break }
+    }
+    if ($old.Count -ne 0) { throw 'Windows Explorer did not exit; update cancelled.' }
+    if (-not (Get-SessionProcesses -Name explorer)) {
+        Start-Process -FilePath "$env:WINDIR\explorer.exe" -WindowStyle Hidden -ErrorAction Stop | Out-Null
+    }
 }
 
 function Get-LatestRelease {
@@ -114,13 +157,21 @@ function Stop-LowBarForUpdate {
         [string]$TargetPath
     )
 
-    $running = @(Get-Process -Name 'LowBar' -ErrorAction SilentlyContinue)
+    $running = @(Get-SessionProcesses -Name 'LowBar')
+    $otherCopies = @($running | Where-Object {
+        -not [string]::Equals($_.Path, $TargetPath, [System.StringComparison]::OrdinalIgnoreCase)
+    })
+    if ($otherCopies.Count -gt 0) {
+        throw 'Another LowBar copy is running from a different folder. Close it before installing this copy.'
+    }
 
     if ($running.Count -eq 0) {
         return
     }
 
-    $matching = @($running)
+    $matching = @($running | Where-Object {
+        [string]::Equals($_.Path, $TargetPath, [System.StringComparison]::OrdinalIgnoreCase)
+    })
 
     if ($matching.Count -eq 0) {
         return
@@ -141,7 +192,7 @@ function Stop-LowBarForUpdate {
     for ($i = 0; $i -lt 40; $i++) {
         Start-Sleep -Milliseconds 250
 
-        $stillRunning = @(Get-Process -Name 'LowBar' -ErrorAction SilentlyContinue | Where-Object {
+        $stillRunning = @(Get-SessionProcesses -Name 'LowBar' | Where-Object {
             $_.Id -in $matching.Id
         })
 
@@ -163,7 +214,7 @@ function Stop-LowBarForUpdate {
     for ($i = 0; $i -lt 20; $i++) {
         Start-Sleep -Milliseconds 250
 
-        $stillRunning = @(Get-Process -Name 'LowBar' -ErrorAction SilentlyContinue | Where-Object {
+        $stillRunning = @(Get-SessionProcesses -Name 'LowBar' | Where-Object {
             $_.Id -in $matching.Id
         })
 
@@ -261,12 +312,14 @@ try {
         throw 'The download completed without producing the expected ZIP archive.'
     }
 
-    if ($null -ne $asset.PSObject.Properties['digest'] -and $asset.digest -and $asset.digest.StartsWith('sha256:')) {
-        $expectedHash = $asset.digest.Substring(7)
-        $actualHash = (Get-FileHash -LiteralPath $tempZip -Algorithm SHA256).Hash
-        if ($actualHash -ne $expectedHash) {
-            throw 'The release ZIP SHA256 does not match the GitHub release metadata.'
-        }
+    if ($null -eq $asset.PSObject.Properties['digest'] -or
+        -not $asset.digest -or -not $asset.digest.StartsWith('sha256:')) {
+        throw 'The release ZIP does not have a GitHub SHA256 digest.'
+    }
+    $expectedHash = $asset.digest.Substring(7)
+    $actualHash = (Get-FileHash -LiteralPath $tempZip -Algorithm SHA256).Hash
+    if ($actualHash -ne $expectedHash) {
+        throw 'The release ZIP SHA256 does not match the GitHub release metadata.'
     }
 
     Write-Step 'Extracting the release package...'
@@ -312,26 +365,54 @@ try {
         -Path $InstallRoot |
         Out-Null
 
-    $targetExe = Join-Path $InstallRoot 'LowBar.exe'
-    $targetHook = Join-Path $InstallRoot 'ExplorerTAP.dll'
-    $targetAssets = Join-Path $InstallRoot 'Assets'
     $isUpdate = Test-Path -LiteralPath $targetExe -PathType Leaf
 
+    $installFull = [System.IO.Path]::GetFullPath($InstallRoot).TrimEnd('\')
+    $assetsFull = [System.IO.Path]::GetFullPath($targetAssets)
+    if (-not $assetsFull.StartsWith($installFull + '\', [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw 'The Assets target is outside the LowBar installation directory.'
+    }
+
+    $hookChanged = -not (Test-Path -LiteralPath $targetHook -PathType Leaf)
+    if (-not $hookChanged) {
+        $hookChanged = (Get-FileHash -LiteralPath $targetHook -Algorithm SHA256).Hash -ne
+            (Get-FileHash -LiteralPath $packageHook -Algorithm SHA256).Hash
+    }
+
+    if ($isUpdate) {
+        $backupExe = Join-Path $tempExtract 'LowBar.exe.backup'
+        Copy-Item -LiteralPath $targetExe -Destination $backupExe -Force
+    }
+    if (Test-Path -LiteralPath $targetHook -PathType Leaf) {
+        $backupHook = Join-Path $tempExtract 'ExplorerTAP.dll.backup'
+        Copy-Item -LiteralPath $targetHook -Destination $backupHook -Force
+    }
+    if (Test-Path -LiteralPath $targetAssets -PathType Container) {
+        $backupAssets = Join-Path $tempExtract 'Assets.backup'
+        Copy-Item -LiteralPath $targetAssets -Destination $backupAssets -Recurse -Force
+    }
+
     if ($isUpdate) { Write-Step 'Existing LowBar installation detected; updating it in place.' }
+    $wasRunning = @(Get-SessionProcesses -Name 'LowBar' | Where-Object {
+        [string]::Equals($_.Path, $targetExe, [System.StringComparison]::OrdinalIgnoreCase)
+    }).Count -gt 0
     Stop-LowBarForUpdate -TargetPath $targetExe
+    $updateStarted = $true
+
+    if ($hookChanged -and $isUpdate) {
+        Restart-ExplorerForHookUpdate
+    }
+
+    if ($hookChanged) {
+        Write-Step 'Replacing ExplorerTAP.dll...'
+        Copy-Item -LiteralPath $packageHook -Destination $targetHook -Force
+    }
 
     Write-Step $(if ($isUpdate) { 'Replacing LowBar.exe...' } else { 'Installing LowBar.exe...' })
 
     Copy-Item `
         -LiteralPath $packageExe `
         -Destination $targetExe `
-        -Force
-
-    Write-Step $(if ($isUpdate) { 'Replacing ExplorerTAP.dll...' } else { 'Installing ExplorerTAP.dll...' })
-
-    Copy-Item `
-        -LiteralPath $packageHook `
-        -Destination $targetHook `
         -Force
 
     Copy-Item -LiteralPath $packageInstaller -Destination (Join-Path $InstallRoot 'install.ps1') -Force
@@ -417,12 +498,19 @@ try {
         $(if ($isUpdate) { "LowBar $($release.tag_name) updated successfully." } else { "LowBar $($release.tag_name) installed successfully." })
 
     Write-Step 'Starting LowBar...'
-    Start-Process `
+    $launched = Start-Process `
         -FilePath $targetExe `
         -WorkingDirectory $InstallRoot `
         -WindowStyle Hidden `
-        -ErrorAction Stop |
-        Out-Null
+        -PassThru `
+        -ErrorAction Stop
+
+    Start-Sleep -Seconds 2
+    if (-not (Get-Process -Id $launched.Id -ErrorAction SilentlyContinue)) {
+        throw 'LowBar exited immediately after the update.'
+    }
+
+    Show-UpdateNotice "LowBar $($release.tag_name) se instaló y la aplicación se reinició."
 
     Write-Host `
         "Start Menu: $startMenuShortcut" `
@@ -449,13 +537,47 @@ try {
         -ForegroundColor White
 }
 catch {
+    $failure = $_.Exception.Message
+    if ($updateStarted) {
+        try {
+            $newInstance = @(Get-SessionProcesses -Name LowBar | Where-Object {
+                [string]::Equals($_.Path, $targetExe, [System.StringComparison]::OrdinalIgnoreCase)
+            })
+            foreach ($instance in $newInstance) {
+                Stop-Process -Id $instance.Id -Force -ErrorAction Stop
+            }
+            if ($backupExe -and (Test-Path -LiteralPath $backupExe)) {
+                Copy-Item -LiteralPath $backupExe -Destination $targetExe -Force
+            }
+            if ($backupHook -and (Test-Path -LiteralPath $backupHook)) {
+                Copy-Item -LiteralPath $backupHook -Destination $targetHook -Force
+            }
+            if ($backupAssets -and (Test-Path -LiteralPath $backupAssets)) {
+                if (Test-Path -LiteralPath $targetAssets) {
+                    Remove-Item -LiteralPath $targetAssets -Recurse -Force
+                }
+                Copy-Item -LiteralPath $backupAssets -Destination $targetAssets -Recurse -Force
+            }
+            if ($wasRunning -and (Test-Path -LiteralPath $targetExe -PathType Leaf) -and
+                -not (Get-SessionProcesses -Name LowBar)) {
+                Start-Process -FilePath $targetExe -WorkingDirectory $InstallRoot -WindowStyle Hidden | Out-Null
+            }
+        } catch {
+            $failure += "; rollback failed: $($_.Exception.Message)"
+        }
+    }
+    if (-not (Get-SessionProcesses -Name explorer)) {
+        try { Start-Process -FilePath "$env:WINDIR\explorer.exe" -WindowStyle Hidden | Out-Null } catch { }
+    }
+    try {
+        New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
+        Add-Content -LiteralPath (Join-Path $InstallRoot 'install-error.log') -Value "$(Get-Date -Format o) $failure"
+    } catch { }
     Write-Host `
-        "[LowBar] Installation failed: $($_.Exception.Message)" `
+        "[LowBar] Installation failed: $failure" `
         -ForegroundColor Red
-
-    Write-Host `
-        '[LowBar] PowerShell session was left open so you can review the error.' `
-        -ForegroundColor DarkGray
+    Show-UpdateNotice 'La actualización de LowBar falló. Revisa install-error.log.'
+    throw $failure
 }
 finally {
     if ($tempZip -and (Test-Path -LiteralPath $tempZip)) {

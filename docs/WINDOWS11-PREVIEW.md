@@ -43,6 +43,11 @@ periódico para imponer el estilo.
   para comprobar releases. En una comparación local, la memoria privada
   bajó de 46,2 MB (v0.1.4) a 13,8–13,9 MB (v0.1.5); la memoria residente puede
   variar con el tiempo y según Windows.
+- El 25 de noviembre de 2026, la copia local v0.1.7-preview usó aproximadamente
+  18 MB de memoria residente y 15 MB de memoria privada en reposo. El
+  comprobador de releases se ejecuta aparte y termina al finalizar; un único
+  temporizador comprueba como máximo una vez al día. No hay un límite absoluto
+  garantizado de memoria ante fallos del proceso o del sistema.
 - El mutex de instancia única usa el error devuelto directamente por Win32;
   abrir LowBar otra vez no deja un segundo proceso residente.
 - Conexión real a Explorer y aplicación a dos barras; transparencia confirmada
@@ -61,3 +66,6 @@ Con Go 1.23 o posterior en PATH, ejecuta `scripts/build-xaml-preview.ps1`.
 El script descarga el paquete oficial fijado de ExplorerTAP, comprueba SHA256,
 ejecuta las pruebas y crea `dist/xaml-preview`. Consulta `THIRD_PARTY.md` antes
 de distribuir una compilación.
+Al preparar la próxima release, pasa `-Version 0.1.8-win11` (o un número mayor)
+para que la versión del ejecutable coincida con el tag `v0.1.8-win11`; una
+release solo se detecta si su número es mayor que el instalado.

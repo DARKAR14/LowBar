@@ -10,6 +10,6 @@ const (
 
 // buildVersion is replaced by scripts/package-release.ps1 for official builds.
 // The fallback keeps local development builds usable.
-var buildVersion = "0.1.6-26h2-preview"
+var buildVersion = "0.1.7-local-preview"
 
 const previewBuild = true

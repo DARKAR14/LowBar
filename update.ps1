@@ -54,15 +54,20 @@ try {
         throw "Release $($release.tag_name) has no verified LowBar.zip asset."
     }
 
-    Notify "Hay una nueva versión de LowBar: $($release.tag_name). Se instalará y la barra se aplicará de nuevo automáticamente."
+    Notify "Hay una nueva versión de LowBar: $($release.tag_name). Se instalará y la barra se aplicará de nuevo. Si cambia el componente de la barra, Explorer se reiniciará y podría cerrar sus ventanas."
     $installer = Join-Path $InstallRoot 'install.ps1'
     if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
         throw 'install.ps1 is missing from this LowBar installation.'
     }
     $arguments = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $installer + '"'),
-        '-Version', $release.tag_name, '-InstallRoot', ('"' + $InstallRoot + '"'))
+        '-Version', $release.tag_name, '-InstallRoot', ('"' + $InstallRoot + '"'), '-AutoUpdate')
     $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -PassThru -WindowStyle Hidden
     if (-not $process) { throw 'Could not start the LowBar installer.' }
+    $process.WaitForExit()
+    if ($process.ExitCode -ne 0) {
+        Remove-Item -LiteralPath $statePath -Force -ErrorAction SilentlyContinue
+        throw "The LowBar installer exited with code $($process.ExitCode)."
+    }
 } catch {
     $message = "$(Get-Date -Format o) $($_.Exception.Message)"
     Add-Content -LiteralPath $logPath -Value $message
