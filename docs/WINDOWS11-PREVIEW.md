@@ -2,6 +2,10 @@
 
 Validado visualmente por el usuario en Windows 11 26H2, build 26300.9550,
 con dos pantallas y estilo Transparente, el 16 de octubre de 2026.
+Tras Windows 11 build 26300.10075, ExplorerTAP 2026.2 dejó de aplicar
+los estilos aunque la llamada COM devolvía éxito. La prueba local con
+ExplorerTAP 2026.4 volvió a mostrar la barra transparente el 25 de noviembre
+de 2026. La versión 2026.4 incluye la corrección de detección del árbol XAML.
 
 ## Uso
 

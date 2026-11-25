@@ -1,14 +1,14 @@
 # Windows 11 XAML preview
 
-This local preview uses **ExplorerTAP.dll from TranslucentTB 2026.2**.
+This local preview uses **ExplorerTAP.dll from TranslucentTB 2026.4**.
 It does not run the TranslucentTB application. ExplorerTAP supplies the XAML
 appearance service in Explorer; LowBar supplies the tray UI and event loop.
 
 - Project: https://github.com/TranslucentTB/TranslucentTB
-- Release/source: https://github.com/TranslucentTB/TranslucentTB/tree/2026.2
+- Release/source: https://github.com/TranslucentTB/TranslucentTB/tree/2026.4
 - License: GNU GPL v3 (see LICENSE.TranslucentTB.md).
-- Download: https://github.com/TranslucentTB/TranslucentTB/releases/download/2026.2/TranslucentTB-portable-x64.zip
-- ZIP SHA256: `0dbe8e0255c20e131cde536dcd0ae490d45989a7d360e26d0150dff1922ac420`
+- Download: https://github.com/TranslucentTB/TranslucentTB/releases/download/2026.4/TranslucentTB-portable-x64.zip
+- ZIP SHA256: `7c0007cc1a1a1f6a3124fee3551fc3653a301d3162aeba78ed9ecf4cdd16aea3`
 - Interface: ITaskbarAppearanceService, UUID 5bcf9150-c28a-4ef2-913c-4c3ea2f5ead0, API 4.
 
 Original LowBar code retains its Apache-2.0 license and notices. New XAML
