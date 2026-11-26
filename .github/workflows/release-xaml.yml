@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*-xaml'
+      - 'v*-win11'
 
 permissions:
   contents: write
@@ -19,10 +20,12 @@ jobs:
           go-version-file: go.mod
       - name: Build verified release ZIP
         shell: pwsh
-        run: ./scripts/build-xaml-preview.ps1
+        run: |
+          $version = '${{ github.ref_name }}' -replace '^v', ''
+          ./scripts/build-xaml-preview.ps1 -Version $version
       - name: Publish GitHub Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create '${{ github.ref_name }}' 'dist/LowBar.zip' --title 'LowBar Windows 11 XAML ${{ github.ref_name }}' --notes 'Community fork. Windows 11 x64 build 22621 or newer. Includes ExplorerTAP 2026.2 (GPL-3.0). See THIRD_PARTY.md and docs/WINDOWS11-PREVIEW.md. Clear mode verified on Windows 11 26H2 with two monitors.' --verify-tag
+          gh release create '${{ github.ref_name }}' 'dist/LowBar.zip' --title 'LowBar Windows 11 XAML ${{ github.ref_name }}' --notes 'Community fork. Windows 11 x64 build 22621 or newer. Includes ExplorerTAP 2026.4 (GPL-3.0) and automatic updates. See THIRD_PARTY.md and docs/WINDOWS11-PREVIEW.md.' --verify-tag

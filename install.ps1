@@ -45,11 +45,18 @@ $tempExtract = $null
 $targetExe = Join-Path $InstallRoot 'LowBar.exe'
 $targetHook = Join-Path $InstallRoot 'ExplorerTAP.dll'
 $targetAssets = Join-Path $InstallRoot 'Assets'
+$targetInstaller = Join-Path $InstallRoot 'install.ps1'
+$targetUpdater = Join-Path $InstallRoot 'update.ps1'
 $backupExe = $null
 $backupHook = $null
 $backupAssets = $null
+$backupInstaller = $null
+$backupUpdater = $null
 $updateStarted = $false
 $wasRunning = $false
+$hookWasReplaced = $false
+$installerWasReplaced = $false
+$updaterWasReplaced = $false
 
 function Write-Step {
     param([string]$Message)
@@ -59,6 +66,23 @@ function Write-Step {
 function Write-Success {
     param([string]$Message)
     Write-Host "[LowBar] $Message" -ForegroundColor Green
+}
+
+function Copy-FileWithRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+    # Windows can retain an executable or DLL handle briefly after its process exits.
+    for ($attempt = 0; $attempt -lt 20; $attempt++) {
+        try {
+            Copy-Item -LiteralPath $Source -Destination $Destination -Force -ErrorAction Stop
+            return
+        } catch {
+            if ($attempt -eq 19) { throw }
+            Start-Sleep -Milliseconds 250
+        }
+    }
 }
 
 function Show-UpdateNotice {
@@ -391,6 +415,14 @@ try {
         $backupAssets = Join-Path $tempExtract 'Assets.backup'
         Copy-Item -LiteralPath $targetAssets -Destination $backupAssets -Recurse -Force
     }
+    if (Test-Path -LiteralPath $targetInstaller -PathType Leaf) {
+        $backupInstaller = Join-Path $tempExtract 'install.ps1.backup'
+        Copy-Item -LiteralPath $targetInstaller -Destination $backupInstaller -Force
+    }
+    if (Test-Path -LiteralPath $targetUpdater -PathType Leaf) {
+        $backupUpdater = Join-Path $tempExtract 'update.ps1.backup'
+        Copy-Item -LiteralPath $targetUpdater -Destination $backupUpdater -Force
+    }
 
     if ($isUpdate) { Write-Step 'Existing LowBar installation detected; updating it in place.' }
     $wasRunning = @(Get-SessionProcesses -Name 'LowBar' | Where-Object {
@@ -405,18 +437,18 @@ try {
 
     if ($hookChanged) {
         Write-Step 'Replacing ExplorerTAP.dll...'
-        Copy-Item -LiteralPath $packageHook -Destination $targetHook -Force
+        Copy-FileWithRetry -Source $packageHook -Destination $targetHook
+        $hookWasReplaced = $true
     }
 
     Write-Step $(if ($isUpdate) { 'Replacing LowBar.exe...' } else { 'Installing LowBar.exe...' })
 
-    Copy-Item `
-        -LiteralPath $packageExe `
-        -Destination $targetExe `
-        -Force
+    Copy-FileWithRetry -Source $packageExe -Destination $targetExe
 
-    Copy-Item -LiteralPath $packageInstaller -Destination (Join-Path $InstallRoot 'install.ps1') -Force
-    Copy-Item -LiteralPath $packageUpdater -Destination (Join-Path $InstallRoot 'update.ps1') -Force
+    $installerWasReplaced = $true
+    Copy-FileWithRetry -Source $packageInstaller -Destination $targetInstaller
+    $updaterWasReplaced = $true
+    Copy-FileWithRetry -Source $packageUpdater -Destination $targetUpdater
 
     Write-Step 'Installing application assets...'
 
@@ -546,17 +578,34 @@ catch {
             foreach ($instance in $newInstance) {
                 Stop-Process -Id $instance.Id -Force -ErrorAction Stop
             }
+            if ($hookWasReplaced -and $backupHook) {
+                Restart-ExplorerForHookUpdate
+            }
             if ($backupExe -and (Test-Path -LiteralPath $backupExe)) {
-                Copy-Item -LiteralPath $backupExe -Destination $targetExe -Force
+                Copy-FileWithRetry -Source $backupExe -Destination $targetExe
             }
             if ($backupHook -and (Test-Path -LiteralPath $backupHook)) {
-                Copy-Item -LiteralPath $backupHook -Destination $targetHook -Force
+                Copy-FileWithRetry -Source $backupHook -Destination $targetHook
             }
             if ($backupAssets -and (Test-Path -LiteralPath $backupAssets)) {
                 if (Test-Path -LiteralPath $targetAssets) {
                     Remove-Item -LiteralPath $targetAssets -Recurse -Force
                 }
                 Copy-Item -LiteralPath $backupAssets -Destination $targetAssets -Recurse -Force
+            }
+            if ($installerWasReplaced) {
+                if ($backupInstaller) {
+                    Copy-FileWithRetry -Source $backupInstaller -Destination $targetInstaller
+                } else {
+                    Remove-Item -LiteralPath $targetInstaller -Force -ErrorAction SilentlyContinue
+                }
+            }
+            if ($updaterWasReplaced) {
+                if ($backupUpdater) {
+                    Copy-FileWithRetry -Source $backupUpdater -Destination $targetUpdater
+                } else {
+                    Remove-Item -LiteralPath $targetUpdater -Force -ErrorAction SilentlyContinue
+                }
             }
             if ($wasRunning -and (Test-Path -LiteralPath $targetExe -PathType Leaf) -and
                 -not (Get-SessionProcesses -Name LowBar)) {

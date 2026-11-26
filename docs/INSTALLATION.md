@@ -1,73 +1,45 @@
-# Installation
+# Installation (Windows 11 fork)
 
-LowBar provides a PowerShell installer for Windows users who do not want to
-clone or download the source repository.
-
-## Install from PowerShell
-
-Open PowerShell and run:
+Open PowerShell as your normal Windows user and run:
 
 ```powershell
-iwr https://raw.githubusercontent.com/chematic/LowBar/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/DARKAR14/LowBar/main/install.ps1 | iex
 ```
 
-The installer:
+The installer downloads the latest published release from
+`DARKAR14/LowBar`, verifies the SHA-256 digest reported by GitHub, and
+installs `LowBar.exe`, `ExplorerTAP.dll`, the assets, and the update scripts
+under `%LOCALAPPDATA%\Programs\LowBar`. It creates a Start Menu shortcut and
+starts LowBar. It does not need administrator privileges.
 
-1. queries the latest GitHub release of `chematic/LowBar`;
-2. downloads only the release asset `LowBar.zip`;
-3. installs it for the current Windows user under `%LOCALAPPDATA%\Programs\LowBar`;
-4. creates or updates `LowBar.lnk` in `%APPDATA%\Microsoft\Windows\Start Menu\Programs`;
-5. asks about a Desktop shortcut on first installation only;
-6. when LowBar is already installed, requests a graceful shutdown, replaces the executable/assets, and starts the updated LowBar automatically.
+## Automatic updates
 
-No Go source code, repository checkout, or development files are installed.
+Starting with the first release that includes `update.ps1`, LowBar checks
+this fork's published GitHub releases at startup and at most once every
+24 hours. When it finds a newer version, it shows a notice, verifies the
+release ZIP, replaces the installation, restarts LowBar, and shows the result.
+The taskbar style is then applied again. A changed `ExplorerTAP.dll` also
+requires restarting Windows Explorer, which can close open File Explorer
+windows. The tray menu has **Check for updates** and an **Automatic updates**
+switch. Source commits without a published release are not installed.
+
+The public v0.1.5 installation does not contain this updater. Existing users
+must run the PowerShell command above once after the first updater release is
+published; subsequent releases can install automatically. If LowBar was
+unpacked to another folder, run the installer to use the standard installation
+directory.
 
 ## Install a specific release
 
 ```powershell
-$script = Invoke-RestMethod https://raw.githubusercontent.com/chematic/LowBar/main/install.ps1
-& ([scriptblock]::Create($script)) -Version v0.1.0
+$script = Invoke-RestMethod https://raw.githubusercontent.com/DARKAR14/LowBar/main/install.ps1
+& ([scriptblock]::Create($script)) -Version v0.1.8-win11
 ```
 
-The GitHub release must contain a runtime asset named `LowBar.zip`. The archive must contain `LowBar.exe`, `LowBarExplorerHook.dll`, the `Assets` directory, and `LICENSE` at its root.
-
-## Run the installer from a downloaded file
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\install.ps1
-```
-
-The installer does not require administrator privileges because it installs only
-for the current user under `%LOCALAPPDATA%\Programs\LowBar`. An administrator prompt
-is only relevant if you explicitly run it with a system-wide/custom protected
-installation path that your account cannot write to.
-
-## Start Menu layout
-
-After installation:
-
-```text
-%LOCALAPPDATA%\Programs\LowBar\LowBar.exe
-%APPDATA%\Microsoft\Windows\Start Menu\Programs\LowBar.lnk
-```
-
-A Desktop shortcut is created only when the user answers `Y`/`Yes` (or the
-French `O`/`Oui`) to the installer prompt.
+The GitHub release must contain a `LowBar.zip` asset with `LowBar.exe`,
+`ExplorerTAP.dll`, `Assets`, `install.ps1`, and `update.ps1` at its root.
 
 ## Uninstall
 
-Delete the Start Menu shortcut and the installation directory:
-
-```powershell
-Remove-Item "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\LowBar.lnk" -Force -ErrorAction SilentlyContinue
-Remove-Item "$env:LOCALAPPDATA\Programs\LowBar" -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item "$([Environment]::GetFolderPath('Desktop'))\LowBar.lnk" -Force -ErrorAction SilentlyContinue
-```
-
-If LowBar is configured to start with Windows, disable **Open at boot** from
-its tray menu before uninstalling.
-
-### Explorer hook payload
-
-The release package also installs `LowBarExplorerHook.dll` next to `LowBar.exe`. It is loaded only into the Explorer process that owns the Windows taskbar and is unloaded by Windows when that Explorer process exits. The hook is required for the taskbar persistence path and should remain beside the executable.
+First disable **Open at boot** and exit LowBar from its tray menu. Then remove
+`%LOCALAPPDATA%\Programs\LowBar` and the `LowBar.lnk` Start Menu shortcut.
